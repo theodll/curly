@@ -1,81 +1,76 @@
-#include <stdio.h>      
-#include <stdlib.h>     
-#include <string.h>     
-#include <unistd.h>    
-#include <sys/socket.h> 
-#include <netdb.h>  
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
-#define PORT 8080
-
-
-typedef struct 
+typedef struct
 {
-
-    struct addrinfo hints; 
+    struct addrinfo hints;
     struct addrinfo *res;
 
-    const char* hostname;
-    const char* port;
+    const char *hostname;
+    const char *port;
     int sock;
 
 } connectionData;
 
-char* get(connectionData* data);
-
-int main(int argc, const char** argv[]) 
+typedef struct
 {
+    const char* fileName;
+    const char* relativeFilePath;
+    char* buffer[]; 
 
-    if (argc < 2) 
-    {
-        perror("Please Specify a hostname");
-        printf("Usage: %s <hostname>\n", argv[0]);
-        return 1;
-    }
+} wFileData; 
 
-    connectionData *data;
-    data->port = "80";
-    data->hostname = argv[1];
-    data->sock = socket(data->res->ai_family, data->res->ai_socktype, data->res->ai_protocol);
-    data->hints.ai_family = AF_INET;
-    data->hints.ai_socktype = SOCK_STREAM;
+void http_get(connectionData *data, char* buffer[]);
+void write_buffer_to_file(wFileData *data);
 
-
-    char* content = get(data); 
-
-
-    close(data->sock);
-
-    freeaddrinfo(data->res);
-
-    return 1;
-};
-
-
-char* get(connectionData* data)
+int main(int argc, const char **argv)
 {
+    connectionData data;
 
+    data.hostname = "google.com";     
+    data.port = "80";
+
+    memset(&data.hints, 0, sizeof(data.hints));
+    data.hints.ai_family   = AF_INET;
+    data.hints.ai_socktype = SOCK_STREAM;
+
+
+    char buffer[8192]; 
+
+    http_get(&data, &buffer);
+
+    return 0;
+}
+
+
+void http_get(connectionData *data, char* buffer[])
+{
     if (getaddrinfo(data->hostname, data->port, &data->hints, &data->res) != 0)
     {
         perror("getaddrinfo");
-        return NULL;
+        exit(1);
     }
 
+    data->sock = socket(data->res->ai_family, data->res->ai_socktype, data->res->ai_protocol);
     if (data->sock < 0)
     {
         perror("socket");
-        return NULL;
+        exit(1);
     }
 
     if (connect(data->sock, data->res->ai_addr, data->res->ai_addrlen) < 0)
     {
         perror("connect");
-        return NULL;
+        exit(1);
     }
-
 
     char request[512];
     snprintf(
-        request, 
+        request,
         sizeof(request),
         "GET / HTTP/1.1\r\n"
         "Host: %s\r\n"
@@ -85,16 +80,17 @@ char* get(connectionData* data)
         data->hostname
     );
 
-    write(data->sock, request, strlen(request)); 
+    write(data->sock, request, strlen(request));
 
-    char buffer[8192];
+    
     ssize_t bytes;
 
-    while ((bytes = read(data->sock, buffer, sizeof(buffer)-1)) > 0) {
+    while ((bytes = read(data->sock, *buffer, sizeof(*buffer)-1)) > 0)
+    {
         buffer[bytes] = '\0';
-        printf("%s", buffer);
+        printf("%s", *buffer);
     }
 
-    return buffer;
-
+    close(data->sock);
+    freeaddrinfo(data->res);
 }

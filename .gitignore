@@ -57,3 +57,7 @@ dkms.conf
 build
 build-client
 build-server
+
+src/curly
+
+.vscode
